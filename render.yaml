@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: vajra-api
+    env: python
+    region: oregon
+    plan: starter
+    buildCommand: "pip install --upgrade pip && pip install -r backend/requirements.txt"
+    startCommand: "PYTHONPATH=backend uvicorn app.api.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: VAJRA_DATA_MODE
+        value: SIMULATED
+      - key: FORECASTER_LABEL
+        value: "Guidance for IMD forecasters — not a public warning"
