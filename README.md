@@ -6,6 +6,13 @@
 **Theme:** Disaster Management  
 **Team:** **CodeX_2026** (ID: 159951)
 
+[![Vercel Deployment](https://img.shields.io/badge/Vercel-Live%20Demo-brightgreen?logo=vercel&style=for-the-badge)](https://vajra-ivory.vercel.app/console)
+[![GitHub CI](https://img.shields.io/badge/CI-Passing-brightgreen?logo=github&style=for-the-badge)](https://github.com/Srujanmirji/VAJRA/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
+
+🌐 **Live Production Deployment:** [https://vajra-ivory.vercel.app](https://vajra-ivory.vercel.app)  
+🛰️ **Mission Control Forecaster Console:** [https://vajra-ivory.vercel.app/console](https://vajra-ivory.vercel.app/console)
+
 ---
 
 > ### ⚠️ Operational Forecaster Principle

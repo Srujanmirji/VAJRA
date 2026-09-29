@@ -47,3 +47,5 @@ yarn-error.log*
 # Large data downloads (keep samples, ignore raw dumps > 100MB)
 data/cache/
 data/downloads/
+.vercel
+.env*
