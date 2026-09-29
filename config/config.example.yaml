@@ -1,0 +1,26 @@
+# VAJRA example configuration
+grid:
+  resolution_km: 1.0
+  cycle_minutes: 5
+regions:
+  kolkata:
+    bbox: [85.9, 21.3, 89.4, 24.0]   # lon_min, lat_min, lon_max, lat_max
+    radar_site: {name: "Kolkata DWR", lon: 88.35, lat: 22.57, range_km: 200}
+  uttarakhand:
+    bbox: [77.5, 29.5, 80.5, 31.5]
+places:                                # for countdowns
+  - {name: Kolkata, lon: 88.37, lat: 22.57, type: city}
+  - {name: Bardhaman, lon: 87.86, lat: 23.24, type: city}
+  - {name: Haldia, lon: 88.06, lat: 22.03, type: city}
+  - {name: Kolkata Airport (VECC), lon: 88.45, lat: 22.65, type: airport}
+thresholds:
+  cloudburst_mm_per_h: 100            # IMD definition
+  cloudburst_min_area_km2: 20
+  storm_dbz: 40
+  countdown_window_percentiles: [10, 90]
+blending:
+  nowcast_only_until_min: 60
+  nwp_full_weight_from_min: 360
+latency_target_minutes: 5
+alerts:
+  languages: [en, hi, bn, kn]

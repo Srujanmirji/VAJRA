@@ -1,0 +1,18 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: vajra
+      POSTGRES_PASSWORD: vajra
+      POSTGRES_DB: vajra
+    ports: ["5432:5432"]
+  api:
+    build: ./backend
+    env_file: .env
+    depends_on: [db]
+    ports: ["8000:8000"]
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+  web:
+    build: ./frontend
+    depends_on: [api]
+    ports: ["3000:3000"]

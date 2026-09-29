@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite it as below."
+title: "VAJRA: Multi-source convective-scale nowcasting for India (SIH 2026, PS 26084)"
+authors:
+  - name: "Team CodeX_2026"
+version: "0.2.0"
+date-released: "2026-09-29"
+license: MIT
