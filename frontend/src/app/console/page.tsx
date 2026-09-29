@@ -116,12 +116,18 @@ export default function ConsolePage() {
     fetchField(selectedFieldType, leadTime, selectedRegion).then(setFieldData).catch(console.error);
   }, [leadTime, selectedFieldType]);
 
+const LEAD_TIME_STEPS = [0, 15, 30, 45, 60, 90, 120, 180, 240, 360];
+
   // Lead Time auto-advance animation
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (isPlayingLead) {
       timer = setInterval(() => {
-        setLeadTime((prev) => (prev >= 180 ? 0 : prev + 15));
+        setLeadTime((prev) => {
+          const idx = LEAD_TIME_STEPS.indexOf(prev);
+          if (idx === -1 || idx >= LEAD_TIME_STEPS.length - 1) return LEAD_TIME_STEPS[0];
+          return LEAD_TIME_STEPS[idx + 1];
+        });
       }, 1500);
     }
     return () => clearInterval(timer);
@@ -242,16 +248,25 @@ export default function ConsolePage() {
 
         {/* Center: Ingest Latency Chips */}
         <div className="hidden xl:flex items-center space-x-2">
-          {sources.map((s) => (
-            <div
-              key={s.id}
-              className="flex items-center space-x-1 px-2 py-0.5 rounded bg-panel-dark border border-panel-border text-[11px] font-mono text-slate-300"
-            >
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-slate-400">{s.id.toUpperCase()}:</span>
-              <span className="text-white font-bold">{Math.round(s.latency_seconds)}s</span>
-            </div>
-          ))}
+          {sources.map((s) => {
+            const ageDisplay =
+              s.id === "nwp"
+                ? "NWP: HRRR 06 UTC (2h 10m ago)"
+                : s.id === "radar"
+                ? `RADAR: VECC S-Band (${Math.round(s.latency_seconds)}s)`
+                : s.id === "satellite"
+                ? `SAT: INSAT-3DS (${Math.round(s.latency_seconds)}s)`
+                : `LIGHTNING: GLM (${Math.round(s.latency_seconds)}s)`;
+            return (
+              <div
+                key={s.id}
+                className="flex items-center space-x-1.5 px-2 py-0.5 rounded bg-panel-dark border border-panel-border text-[11px] font-mono text-slate-300"
+              >
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>{ageDisplay}</span>
+              </div>
+            );
+          })}
         </div>
 
         {/* Right: Replay Controls */}
@@ -485,51 +500,113 @@ export default function ConsolePage() {
             />
 
             {/* Point Inspector Popover if user clicked on map */}
-            {pinnedPoint && (
-              <div className="absolute top-4 left-4 z-40 bg-panel-dark/95 border border-vajra-orange/50 p-3 rounded-lg shadow-2xl backdrop-blur-md w-72 text-xs font-mono">
-                <div className="flex items-center justify-between border-b border-panel-border pb-1.5 mb-2">
-                  <div className="flex items-center space-x-1.5 text-vajra-orange font-bold">
-                    <MapPin className="w-3.5 h-3.5" />
-                    <span>Point Inspection</span>
+            {pinnedPoint && (() => {
+              let sampledVal: number | null = null;
+              if (fieldData?.bounds && fieldData.data && fieldData.data.length > 0) {
+                const { lat_min, lat_max, lon_min, lon_max, ny, nx } = fieldData.bounds;
+                if (
+                  pinnedPoint.lat >= lat_min &&
+                  pinnedPoint.lat <= lat_max &&
+                  pinnedPoint.lon >= lon_min &&
+                  pinnedPoint.lon <= lon_max
+                ) {
+                  const y = Math.min(
+                    ny - 1,
+                    Math.max(0, Math.floor((1 - (pinnedPoint.lat - lat_min) / (lat_max - lat_min)) * ny))
+                  );
+                  const x = Math.min(
+                    nx - 1,
+                    Math.max(0, Math.floor(((pinnedPoint.lon - lon_min) / (lon_max - lon_min)) * nx))
+                  );
+                  if (fieldData.data[y] && fieldData.data[y][x] !== undefined) {
+                    sampledVal = fieldData.data[y][x];
+                  }
+                }
+              }
+
+              const dLat = (pinnedPoint.lat - 22.57) * 111.0;
+              const dLon = (pinnedPoint.lon - 88.35) * 102.5;
+              const distToRadar = Math.hypot(dLat, dLon);
+              const isInsideRadar = distToRadar <= 250.0;
+
+              let nearestCell: StormCellData | null = null;
+              let minCellDist = Infinity;
+              let bearingStr = "";
+
+              cells.forEach((c) => {
+                const dy = (c.lat - pinnedPoint.lat) * 111.0;
+                const dx = (c.lon - pinnedPoint.lon) * 102.5;
+                const d = Math.hypot(dy, dx);
+                if (d < minCellDist) {
+                  minCellDist = d;
+                  nearestCell = c;
+                  const deg = (Math.atan2(dx, dy) * (180 / Math.PI) + 360) % 360;
+                  const cardinals = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+                  const cIdx = Math.round(deg / 22.5) % 16;
+                  bearingStr = `${cardinals[cIdx]} (${Math.round(deg)}°)`;
+                }
+              });
+
+              return (
+                <div className="absolute top-4 left-4 z-40 bg-panel-dark/95 border border-vajra-orange/50 p-3 rounded-lg shadow-2xl backdrop-blur-md w-80 text-xs font-mono">
+                  <div className="flex items-center justify-between border-b border-panel-border pb-1.5 mb-2">
+                    <div className="flex items-center space-x-1.5 text-vajra-orange font-bold">
+                      <MapPin className="w-3.5 h-3.5" />
+                      <span>Point Inspection</span>
+                    </div>
+                    <button
+                      onClick={() => setPinnedPoint(null)}
+                      className="text-slate-400 hover:text-white text-xs font-bold"
+                    >
+                      ✕
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setPinnedPoint(null)}
-                    className="text-slate-400 hover:text-white text-xs font-bold"
-                  >
-                    ✕
-                  </button>
+                  <div className="space-y-1.5 text-slate-300">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Coordinates:</span>
+                      <span className="text-white font-bold">
+                        {pinnedPoint.lat.toFixed(3)}°N, {pinnedPoint.lon.toFixed(3)}°E
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Radar Coverage:</span>
+                      {isInsideRadar ? (
+                        <span className="text-emerald-400 font-bold">Inside VECC Ring ({Math.round(distToRadar)} km)</span>
+                      ) : (
+                        <span className="text-amber-400 font-bold">Outside DWR Limit ({Math.round(distToRadar)} km · Sat-Only)</span>
+                      )}
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Echo Intensity:</span>
+                      <span className="text-white font-bold">
+                        {sampledVal !== null && sampledVal > -30
+                          ? `${sampledVal.toFixed(1)} ${fieldData?.unit || "dBZ"}`
+                          : `< 15 ${fieldData?.unit || "dBZ"} (No echo)`}
+                      </span>
+                    </div>
+                    {nearestCell && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Nearest Storm:</span>
+                        <span className="text-vajra-orange font-bold">
+                          {(nearestCell as StormCellData).cell_id} ({minCellDist.toFixed(1)} km {bearingStr})
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="space-y-1.5 text-slate-300">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Coordinates:</span>
-                    <span>{pinnedPoint.lat.toFixed(3)}°N, {pinnedPoint.lon.toFixed(3)}°E</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Radar Coverage:</span>
-                    <span className="text-emerald-400 font-bold">Inside S-Band Ring (1 km)</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Reflectivity Now:</span>
-                    <span className="text-white font-bold">{Math.round(fieldData?.min_value || 0)} dBZ</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Nearest Storm:</span>
-                    <span className="text-vajra-orange">CELL-01 (~18 km WNW)</span>
-                  </div>
-                </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
 
           {/* --------------------------------------------------------------- */}
           {/* BOTTOM: HONEST LEAD-TIME SCRUBBER (0 TO 360 MIN)                */}
           {/* --------------------------------------------------------------- */}
-          <div className="bg-panel border-t border-panel-border px-4 py-2.5 flex flex-col gap-1.5 z-20">
+          <div className="bg-panel border-t border-panel-border px-4 py-2 flex flex-col gap-2 z-20">
             <div className="flex items-center justify-between text-xs font-mono">
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => setIsPlayingLead(!isPlayingLead)}
-                  className="px-2.5 py-1 rounded bg-vajra-orange text-slate-950 font-bold flex items-center space-x-1"
+                  className="px-2.5 py-1 rounded bg-vajra-orange text-slate-950 font-bold flex items-center space-x-1 shadow"
                 >
                   {isPlayingLead ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                   <span>{isPlayingLead ? "Pause" : "Play Nowcast"}</span>
@@ -540,47 +617,110 @@ export default function ConsolePage() {
                 </span>
               </div>
 
-              {/* Strict Honesty Guidance Alert for Lead Times */}
-              <div className="text-[11px] text-slate-400">
+              {/* Confidence Transition Indicator */}
+              <div className="text-[11px] font-mono">
                 {leadTime <= 60 ? (
-                  <span className="text-emerald-400 font-semibold">
-                    ● 0–60 min: High Confidence (1 km Radar + Optical Flow Extrapolation)
+                  <span className="text-emerald-400 font-semibold flex items-center">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block mr-1.5 animate-pulse"></span>
+                    0–60 min: High Confidence (Radar extrapolation + AI)
                   </span>
                 ) : leadTime <= 120 ? (
-                  <span className="text-amber-400 font-semibold">
-                    ▲ 60–120 min: Medium Confidence (Ensemble + Satellite Cooling Trend)
+                  <span className="text-amber-400 font-semibold flex items-center">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 inline-block mr-1.5"></span>
+                    60–120 min: Medium Confidence (AI-NWP blend)
                   </span>
                 ) : (
-                  <span className="text-blue-400 font-semibold">
-                    ◆ 120–360 min: NWP Skill-Weighted Blend (Area Probabilities Only · Read-Only)
+                  <span className="text-blue-400 font-semibold flex items-center">
+                    <span className="w-2 h-2 rounded-full bg-blue-400 inline-block mr-1.5"></span>
+                    120–360 min: Area Probability (NWP ensemble)
                   </span>
                 )}
               </div>
             </div>
 
-            {/* Slider */}
+            {/* Confidence Bands Bar */}
+            <div className="relative w-full h-3 flex rounded overflow-hidden border border-panel-border">
+              <div
+                className="h-full bg-emerald-500/20 border-r border-emerald-500/60 flex items-center px-1 text-[9px] font-mono text-emerald-300 select-none"
+                style={{ width: "16.666%" }}
+                title="0-60 min: High confidence (Radar extrapolation + AI)"
+              >
+                <span className="truncate">0-60m High</span>
+              </div>
+              <div
+                className="h-full bg-amber-500/20 border-r border-dashed border-amber-500/60 flex items-center px-1 text-[9px] font-mono text-amber-300 select-none"
+                style={{ width: "16.666%" }}
+                title="60-120 min: Medium confidence (AI-NWP blend)"
+              >
+                <span className="truncate">60-120m Blend</span>
+              </div>
+              <div
+                className="h-full bg-blue-500/15 flex items-center px-2 text-[9px] font-mono text-blue-300 select-none border-l border-dotted border-blue-400/40"
+                style={{ width: "66.668%" }}
+                title="120-360 min: Area probability (NWP ensemble)"
+              >
+                <span className="truncate">120-360m Area Probabilities (NWP Ensemble)</span>
+              </div>
+            </div>
+
+            {/* Slider Scrubber snapping to LEAD_TIME_STEPS */}
             <div className="relative flex items-center">
               <input
                 type="range"
                 min="0"
-                max="360"
-                step="15"
-                value={leadTime}
-                onChange={(e) => setLeadTime(Number(e.target.value))}
+                max={LEAD_TIME_STEPS.length - 1}
+                step="1"
+                value={Math.max(0, LEAD_TIME_STEPS.indexOf(leadTime))}
+                onChange={(e) => setLeadTime(LEAD_TIME_STEPS[Number(e.target.value)])}
                 className="w-full h-2 bg-panel-dark rounded-lg appearance-none cursor-pointer accent-vajra-orange"
               />
             </div>
 
-            {/* Slider Scale Ticks */}
-            <div className="flex justify-between text-[10px] font-mono text-slate-500 px-1">
-              <span>0m (Analysis)</span>
-              <span>+30m</span>
-              <span>+60m (1h)</span>
-              <span>+120m (2h)</span>
-              <span>+180m (3h)</span>
-              <span>+240m (4h)</span>
-              <span>+300m (5h)</span>
-              <span>+360m (6h Blend)</span>
+            {/* Distinct Non-Overlapping Tick Marks */}
+            <div className="flex justify-between items-center text-[10px] font-mono text-slate-400 px-0.5">
+              {LEAD_TIME_STEPS.map((t) => {
+                const isSelected = leadTime === t;
+                const isHigh = t <= 60;
+                const isMed = t > 60 && t <= 120;
+                return (
+                  <button
+                    key={t}
+                    onClick={() => setLeadTime(t)}
+                    className={`flex flex-col items-center transition-all cursor-pointer group ${
+                      isSelected
+                        ? "text-vajra-orange font-bold scale-110"
+                        : isHigh
+                        ? "text-emerald-400/80 hover:text-emerald-300"
+                        : isMed
+                        ? "text-amber-400/80 hover:text-amber-300"
+                        : "text-blue-400/70 hover:text-blue-300"
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full mb-0.5 ${
+                        isSelected ? "bg-vajra-orange ring-2 ring-vajra-orange/40" : "bg-slate-600 group-hover:bg-slate-400"
+                      }`}
+                    />
+                    <span>{t === 0 ? "0m" : `+${t}m`}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Confidence Bands Legend */}
+            <div className="flex flex-wrap items-center justify-between text-[10px] font-mono text-slate-400 pt-0.5 border-t border-panel-border/60">
+              <div className="flex items-center space-x-1.5">
+                <span className="w-2.5 h-1.5 bg-emerald-500/50 border border-emerald-500 rounded-sm"></span>
+                <span className="text-slate-300">0–60 min: High confidence (Radar extrapolation + AI)</span>
+              </div>
+              <div className="flex items-center space-x-1.5">
+                <span className="w-2.5 h-1.5 bg-amber-500/40 border border-dashed border-amber-500 rounded-sm"></span>
+                <span className="text-slate-300">60–120 min: Medium confidence (AI-NWP blend)</span>
+              </div>
+              <div className="flex items-center space-x-1.5">
+                <span className="w-2.5 h-1.5 bg-blue-500/30 border border-dotted border-blue-400 rounded-sm"></span>
+                <span className="text-slate-300">120–360 min: Area probability (NWP ensemble)</span>
+              </div>
             </div>
           </div>
         </div>
@@ -624,8 +764,11 @@ export default function ConsolePage() {
                 {countdowns.map((c) => (
                   <div
                     key={c.place_code}
-                    className={`p-2.5 rounded-lg border transition-all ${
-                      c.approaching
+                    onClick={() => setPinnedPoint({ lat: c.lat, lon: c.lon })}
+                    className={`p-2.5 rounded-lg border transition-all cursor-pointer hover:border-vajra-orange/70 ${
+                      c.countdown_display === "STORM OVERHEAD"
+                        ? "bg-red-950/40 border-red-500/70 shadow-lg glow-severe"
+                        : c.approaching
                         ? "bg-panel-dark border-amber-500/40 shadow"
                         : "bg-panel-dark/50 border-panel-border"
                     }`}
@@ -635,7 +778,16 @@ export default function ConsolePage() {
                         <span className="font-semibold text-white">{c.place_name}</span>
                         <span className="text-[10px] text-slate-500 ml-1.5 font-mono">({c.place_code})</span>
                       </div>
-                      {c.approaching ? (
+                      {c.countdown_display === "STORM OVERHEAD" ? (
+                        <div className="flex items-center space-x-1.5">
+                          <span className="text-red-400 font-mono font-bold text-xs animate-pulse">
+                            STORM OVERHEAD
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 font-mono font-bold">
+                            {c.probability_pct}%
+                          </span>
+                        </div>
+                      ) : c.approaching ? (
                         <div className="flex items-center space-x-1.5">
                           <span className="text-vajra-orange font-mono font-bold text-sm">
                             {c.countdown_display}
@@ -644,13 +796,19 @@ export default function ConsolePage() {
                             {c.probability_pct}%
                           </span>
                         </div>
+                      ) : c.countdown_display === "Passed" ? (
+                        <span className="text-slate-400 font-mono text-[11px] bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700">
+                          Passed
+                        </span>
                       ) : (
-                        <span className="text-slate-500 font-mono text-[11px]">--:--</span>
+                        <span className="text-slate-500 font-mono text-[11px] bg-slate-800/60 px-2 py-0.5 rounded border border-slate-800">
+                          No threat in 6h
+                        </span>
                       )}
                     </div>
                     <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
                       <span>Window: {c.window_display}</span>
-                      <span className="uppercase text-[10px] text-slate-500">{c.place_type}</span>
+                      <span className="uppercase text-[10px] text-slate-500">{c.primary_hazard || c.place_type}</span>
                     </div>
                   </div>
                 ))}

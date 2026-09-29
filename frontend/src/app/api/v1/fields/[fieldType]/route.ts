@@ -8,7 +8,7 @@ export async function GET(
   const { searchParams } = new URL(req.url);
   const lead = parseInt(searchParams.get("lead") || "0");
   const region = searchParams.get("region") || "kolkata";
-  const downsample = parseInt(searchParams.get("downsample") || "2");
+  const downsample = parseInt(searchParams.get("downsample") || "1");
 
   return NextResponse.json(getFieldData(params.fieldType, lead, region, downsample));
 }
