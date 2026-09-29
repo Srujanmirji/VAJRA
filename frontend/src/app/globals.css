@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-main: #070B14;
+  --panel-bg: #0E1626;
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --accent-orange: #F28C28;
+  --navy: #1F3864;
+  --blue: #0070C0;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: #E2E8F0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Glass panel style */
+.glass-panel {
+  background: rgba(14, 22, 38, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-panel-accent {
+  background: rgba(14, 22, 38, 0.95);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(242, 140, 40, 0.25);
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #090F1C;
+}
+::-webkit-scrollbar-thumb {
+  background: #1F3864;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #F28C28;
+}
+
+/* Hatched pattern for lower-confidence satellite-only zone */
+.hatched-satellite-zone {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.02),
+    rgba(255, 255, 255, 0.02) 10px,
+    rgba(255, 255, 255, 0.06) 10px,
+    rgba(255, 255, 255, 0.06) 20px
+  );
+}
+
+/* Glow effects for active hazards */
+.glow-lightning {
+  box-shadow: 0 0 15px rgba(255, 212, 0, 0.4);
+}
+.glow-hail {
+  box-shadow: 0 0 15px rgba(103, 232, 249, 0.4);
+}
+.glow-downburst {
+  box-shadow: 0 0 15px rgba(168, 85, 247, 0.4);
+}
+.glow-cloudburst {
+  box-shadow: 0 0 15px rgba(30, 136, 229, 0.5);
+}
+.glow-severe {
+  box-shadow: 0 0 20px rgba(192, 24, 45, 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
